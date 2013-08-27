@@ -1,8 +1,8 @@
 {
-  "name":"kirsten-roschanski/contao-avatar",
-  "description":"Avatar",
-  "keywords":["contao", "avatar", "member"],
-  "type":"contao-module",
+  "name":"kirsten-roschanski/isotope-billsafe",
+  "description":"Isotope eCommerce: BillSAFE payment module",
+  "keywords":["contao", "billsafe", "isotope"],
+  "type":"isotope-payment-module",
   "homepage":"",
   "license":"LGPL-3.0+",
   "authors":[
@@ -11,25 +11,19 @@
       "email":"kontakt@kirsten-roschanski.de",
       "homepage":"http://kirsten-roschanski.de",
       "role":"Developer"
-    },
-    {
-      "name":"Tristan Lins",
-      "email":"tristan.lins@bit3.de",
-      "homepage":"http://bit3.de",
-      "role":"Developer"
     }
   ],
   "support":{
     "email":"kontakt@kirsten-roschanski.de",
-    "issues":"https://github.com/katgirl/contao-avatar/issues",
+    "issues":"https://github.com/katgirl/isotope-billsafe/issues",
     "forum":"",
-    "wiki":"http://de.contaowiki.org/Avatar",
+    "wiki":"https://github.com/katgirl/isotope-billsafe/wiki",
     "irc":"irc://irc.freenode.org/contao.dev",
-    "source":"https://github.com/katgirl/contao-avatar" 
+    "source":"https://github.com/katgirl/isotope-billsafe" 
   },
   "require":{
     "php":">=5.3",
-    "contao/core":"3.0"
+    "contao/core":"2.11"
   },
   "autoload": {
     "classmap": ["src/"]
