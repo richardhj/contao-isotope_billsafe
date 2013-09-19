@@ -34,7 +34,6 @@ class PaymentBillSAFE extends IsotopePayment
 	 */
 	public function processPayment()
 	{
-    echo "hier";
 		$objOrder = new IsotopeOrder();
     
 		if (!$objOrder->findBy('cart_id', $this->Isotope->Cart->id))
