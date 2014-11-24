@@ -26,5 +26,8 @@ $GLOBALS['ISO_LANG']['PAY']['billsafe'] = array('BillSAFE', 'This module support
  */
 $GLOBALS['TL_LANG']['MSC']['pay_with_billsafe']	= array('Pay with BillSAFE', 'You will be redirected to Bill safe payment may wish to order. If you are not immediately redirected, please click on "Pay Now".', 'Pay Now');
 
+$GLOBALS['TL_LANG']['MSC']['billsafe_nvp_error']['housenumber'] = 'Please check your address for the house number.';
+$GLOBALS['TL_LANG']['MSC']['billsafe_nvp_error']['dateOfBirth'] = 'Please check your date of birth for completeness and trueness.';
+
 $GLOBALS['ISO_LANG']['billsafe']['product_types']['invoice'] = 'Invoice';
 $GLOBALS['ISO_LANG']['billsafe']['product_types']['installment'] = 'Installment';

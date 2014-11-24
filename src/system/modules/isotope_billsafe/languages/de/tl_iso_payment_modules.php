@@ -35,10 +35,22 @@ $GLOBALS['TL_LANG']['tl_iso_payment_modules']['billsafe_applicationSignature'] =
 	'Von BillSAFE vergebene Kennung zur Identifikation Ihrer Applikation.'
 );
 
+$GLOBALS['TL_LANG']['tl_iso_payment_modules']['billsafe_publicKey'] = array
+(
+	'Public-Key',
+	'Von BillSAFE vergebener Public-Key für die OnSite-Checkout-Implementation.'
+);
+
 $GLOBALS['TL_LANG']['tl_iso_payment_modules']['billsafe_product'] = array
 (
 	'Zahlart',
 	'Kennung der ausgewählten Zahlart.'
+);
+
+$GLOBALS['TL_LANG']['tl_iso_payment_modules']['billsafe_onsiteCheckout'] = array
+(
+	'OnSite-Checkout verwenden',
+	'Beim OnSite-Checkout wird der Kunde nicht über das BillSAFE-Gateway geleitet. Bitte beachten Sie, dass dies eine mit BillSAFE entsprechende Zusatzvereinbarung (Factoringvertrag) bedarf.'
 );
 
 $GLOBALS['TL_LANG']['tl_iso_payment_modules']['billsafe_method'] = array

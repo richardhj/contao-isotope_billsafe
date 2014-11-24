@@ -18,7 +18,7 @@
 /**
  * Palettes
  */
-$GLOBALS['TL_DCA']['tl_iso_payment_modules']['palettes']['billsafe'] = '{type_legend},name,label,type;{note_legend:hide},note;{config_legend},new_order_status,minimum_total,maximum_total,countries,shipping_modules,product_types;{gateway_legend},billsafe_merchantId,billsafe_merchantLicense,billsafe_applicationSignature,billsafe_product,billsafe_method;{price_legend:hide},price,tax_class;{template_legend},button;{expert_legend:hide},guests,protected;{enabled_legend},debug,enabled';
+$GLOBALS['TL_DCA']['tl_iso_payment_modules']['palettes']['billsafe'] = '{type_legend},name,label,type;{note_legend:hide},note;{config_legend},new_order_status,minimum_total,maximum_total,countries,shipping_modules,product_types;{gateway_legend},billsafe_merchantId,billsafe_merchantLicense,billsafe_applicationSignature,billsafe_publicKey,billsafe_product,billsafe_onsiteCheckout,billsafe_method;{price_legend:hide},price,tax_class;{template_legend},button;{expert_legend:hide},guests,protected;{enabled_legend},debug,enabled';
 
 
 /**
@@ -45,6 +45,13 @@ $GLOBALS['TL_DCA']['tl_iso_payment_modules']['fields']['billsafe_applicationSign
 	'eval'              => array('mandatory'=>true, 'maxlength'=>255, 'tl_class'=>'w50'),
 );
 
+$GLOBALS['TL_DCA']['tl_iso_payment_modules']['fields']['billsafe_publicKey'] = array
+(
+	'label'             => &$GLOBALS['TL_LANG']['tl_iso_payment_modules']['billsafe_publicKey'],
+	'inputType'         => 'text',
+	'eval'              => array('mandatory'=>true, 'maxlength'=>255, 'tl_class'=>'w50'),
+);
+
 $GLOBALS['TL_DCA']['tl_iso_payment_modules']['fields']['billsafe_product'] = array
 (
 	'label'             => &$GLOBALS['TL_LANG']['tl_iso_payment_modules']['billsafe_product'],
@@ -54,6 +61,14 @@ $GLOBALS['TL_DCA']['tl_iso_payment_modules']['fields']['billsafe_product'] = arr
 	'options'           => array('invoice', 'installment'),
 	'reference'	        => $GLOBALS['ISO_LANG']['billsafe']['product_types'],
 	'eval'              => array('mandatory'=>true, 'maxlength'=>255, 'tl_class'=>'w50'),
+);
+
+$GLOBALS['TL_DCA']['tl_iso_payment_modules']['fields']['billsafe_onsiteCheckout'] = array
+(
+	'label'             => &$GLOBALS['TL_LANG']['tl_iso_payment_modules']['billsafe_onsiteCheckout'],
+	'exclude'           => true,
+	'inputType'         => 'checkbox',
+	'eval'              => array('tl_class'=>'w50 m12'),
 );
 
 $GLOBALS['TL_DCA']['tl_iso_payment_modules']['fields']['billsafe_method'] = array

@@ -21,7 +21,7 @@
 $GLOBALS['TL_DCA']['tl_iso_orderstatus']['palettes']['default'] = str_replace
 (
 	',paid',
-	',paid,shipped',
+	',paid,shipped,cancelled',
 	$GLOBALS['TL_DCA']['tl_iso_orderstatus']['palettes']['default']
 );
 
@@ -35,4 +35,12 @@ $GLOBALS['TL_DCA']['tl_iso_orderstatus']['fields']['shipped'] = array
   'exclude'                 => true,
   'inputType'               => 'checkbox',
   'eval'                    => array('tl_class'=>'w50'),
+);
+
+$GLOBALS['TL_DCA']['tl_iso_orderstatus']['fields']['cancelled'] = array
+(
+	'label'                   => &$GLOBALS['TL_LANG']['tl_iso_orderstatus']['cancelled'],
+	'exclude'                 => true,
+	'inputType'               => 'checkbox',
+	'eval'                    => array('tl_class'=>'w50'),
 );

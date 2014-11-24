@@ -36,10 +36,22 @@ $GLOBALS['TL_LANG']['tl_iso_payment_modules']['billsafe_applicationSignature'] =
 	'By BillSAFE assigned identifier used to identify your application.'
 );
 
+$GLOBALS['TL_LANG']['tl_iso_payment_modules']['billsafe_publicKey'] = array
+(
+	'public key',
+	'By BillSAFE assigned public key for the OnSite checkout implementation.'
+);
+
 $GLOBALS['TL_LANG']['tl_iso_payment_modules']['billsafe_product'] = array
 (
 	'Payment product',
 	'Label of the selected payment method.'
+);
+
+$GLOBALS['TL_LANG']['tl_iso_payment_modules']['billsafe_onsiteCheckout'] = array
+(
+	'Use OnSite checkout',
+	'The customer will not be redirected to the BillSAFE gateway. You have to inform BillSAFE about the usage of the <em>processOrder</em> function (accordant additional arrangement).'
 );
 
 $GLOBALS['TL_LANG']['tl_iso_payment_modules']['billsafe_method'] = array

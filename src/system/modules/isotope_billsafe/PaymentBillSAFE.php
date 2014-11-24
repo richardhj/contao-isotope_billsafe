@@ -33,6 +33,7 @@ class PaymentBillSAFE extends IsotopePayment
 	public function processPayment()
 	{
 		$objOrder = new IsotopeOrder();
+
 		if (!$objOrder->findBy('cart_id', $this->Isotope->Cart->id))
 		{
 			$this->log('Order ID "' . $this->Input->get('orderID') . '" not found', __METHOD__, TL_ERROR);
@@ -40,34 +41,53 @@ class PaymentBillSAFE extends IsotopePayment
 			return false;
 		}
 
-		if ($objOrder->date_paid > 0 && $objOrder->date_paid <= time())
+		if ($this->billsafe_onsiteCheckout)
 		{
-			IsotopeFrontend::clearTimeout();
-			return true;
+			// Block second try
+			if ($_SESSION['CHECKOUT_DATA']['payment']['status'] == 'declined')
+			{
+				$this->redirect($this->addToUrl('step=payment', true));
+			}
+
+			$objRequest = $this->callMethod('processOrder', $this->returnOrderRequestParam($objOrder, $this->Isotope->Cart->billingAddress));
+		}
+		else
+		{
+			$arrParam['token'] = $this->Input->get('token', true);
+
+			$objRequest = $this->callMethod('getTransactionResult', $arrParam);
 		}
 
-		$this->apiUrl = $this->debug ? $this->apiUrlSandbox : $this->apiUrlLive;
-		$this->gatewayUrl = $this->debug ? $this->gatewayUrlSandbox : $this->gatewayUrlLive;
-
-		$arrParam['token'] = $this->Input->get('token', true);
-
-		$objRequest = $this->callMethod('getTransactionResult', $arrParam);
 		parse_str($objRequest->response, $arrRequest);
 
 		if ($arrRequest['ack'] == 'ERROR')
 		{
-			$this->log('Payment could not be processed.', __METHOD__, TL_ERROR);
-			$this->log('BillSAFE NVP: ' . $arrRequest['errorList_0_code'] . " " . $arrRequest['errorList_0_message'], __METHOD__, TL_ERROR);
+			// Handle invalid parameters
+			if ($arrRequest['errorList_0_code'] == 216)
+			{
+				if (strpos($arrRequest['errorList_0_message'], 'housenumber') !== false)
+				{
+					$this->redirect($this->addToUrl('step=failed', true) . '?reason=' . urlencode($GLOBALS['TL_LANG']['MSC']['billsafe_nvp_error']['housenumber']));
+				}
+				elseif (strpos($arrRequest['errorList_0_message'], 'dateOfBirth') !== false)
+				{
+					$this->redirect($this->addToUrl('step=failed', true) . '?reason=' . urlencode($GLOBALS['TL_LANG']['MSC']['billsafe_nvp_error']['dateOfBirth']));
+				}
+			}
+
+			$this->log('BillSAFE payment could not be processed. NVP: ' . $arrRequest['errorList_0_code'] . ' ' . $arrRequest['errorList_0_message'], __METHOD__, TL_ERROR);
 			$this->redirect($this->addToUrl('step=failed', true));
 		}
 		elseif ($arrRequest['ack'] == 'OK')
 		{
 			if ($arrRequest['status'] == 'ACCEPTED')
 			{
-				IsotopeFrontend::clearTimeout();
+				if (!$this->billsafe_onsiteCheckout)
+				{
+					IsotopeFrontend::clearTimeout();
+				}
 
 				// Update order status
-				$objOrder->date_paid = time();
 				$objOrder->updateOrderStatus($this->new_order_status);
 
 				// Save payment instruction
@@ -80,13 +100,6 @@ class PaymentBillSAFE extends IsotopePayment
 
 				$objOrder->payment_data = $arrPaymentInstruction;
 
-				// Inform BillSAFE about invoice number
-				$arrParam = array();
-				$arrParam['orderNumber'] = $objOrder->id;
-				$arrParam['invoiceNumber'] = $this->Isotope->Config->orderPrefix . $objOrder->order_id;
-
-				$this->callMethod('setInvoiceNumber', $arrParam);
-
 				// Save order
 				$objOrder->save();
 
@@ -94,12 +107,17 @@ class PaymentBillSAFE extends IsotopePayment
 			}
 			else
 			{
-				$this->log('Payment was declined.', __METHOD__, TL_ERROR);
-				$this->log('BillSAFE NVP: ' . $arrRequest['declineReason_code'] . " " . $arrRequest['declineReason_message'], __METHOD__, TL_ERROR);
-				$this->redirect($this->addToUrl('step=failed', true) . '&reason=' . urlencode($arrRequest['declineReason_buyerMessage']));
+				if ($this->billsafe_onsiteCheckout)
+				{
+					$_SESSION['CHECKOUT_DATA']['payment']['status'] = 'declined';
+					$_SESSION['CHECKOUT_DATA']['responseMsg'] = $arrRequest['declineReason_buyerMessage'];
+				}
+
+				$this->log('BillSAFE payment was declined. NVP: ' . $arrRequest['declineReason_code'] . ' ' . $arrRequest['declineReason_message'], __METHOD__, TL_ERROR);
+				$this->redirect($this->addToUrl('step=failed', true) . '?reason=' . urlencode($arrRequest['declineReason_buyerMessage']));
 			}
 		}
-		elseif (IsotopeFrontend::setTimeout())
+		elseif (!$this->billsafe_onsiteCheckout && IsotopeFrontend::setTimeout())
 		{
 			global $objPage;
 			$objPage->noSearch = 1;
@@ -113,6 +131,8 @@ class PaymentBillSAFE extends IsotopePayment
 
 		$this->log('Payment could not be processed.', __METHOD__, TL_ERROR);
 		$this->redirect($this->addToUrl('step=failed', true));
+
+		return false;
 	}
 
 
@@ -122,6 +142,11 @@ class PaymentBillSAFE extends IsotopePayment
 	 */
 	public function checkoutForm()
 	{
+		if ($this->billsafe_onsiteCheckout)
+		{
+			return false;
+		}
+
 		$objOrder = new IsotopeOrder();
 
 		if (!$objOrder->findBy('cart_id', $this->Isotope->Cart->id))
@@ -129,40 +154,7 @@ class PaymentBillSAFE extends IsotopePayment
 			$this->redirect($this->addToUrl('step=failed', true));
 		}
 
-		$this->apiUrl = $this->debug ? $this->apiUrlSandbox : $this->apiUrlLive;
-		$this->gatewayUrl = $this->debug ? $this->gatewayUrlSandbox : $this->gatewayUrlLive;
-
-		$objAddress = $this->Isotope->Cart->billingAddress;
-
-		$order_taxAmount = (int)$objOrder->taxTotal > 0 ? $this->Isotope->Cart->grandTotal : 0;
-
-		$arrParam = array
-		(
-			'order_number'       => $objOrder->id,
-			'order_amount'       => number_format($this->Isotope->Cart->grandTotal, 2, '.', ''),
-			'order_taxAmount'    => number_format($order_taxAmount, 2, '.', ''),
-			'order_currencyCode' => $this->Isotope->Config->currency,
-			'customer'           => array
-			(
-				'firstname'   => $objAddress->firstname,
-				'lastname'    => $objAddress->lastname,
-				'street'      => $objAddress->street_1,
-				'houseNumber' => $objAddress->street_2,
-				'postcode'    => $objAddress->postal,
-				'city'        => $objAddress->city,
-				'country'     => $objAddress->country,
-				'email'       => $objAddress->email,
-				'phone'       => $objAddress->phone
-			),
-			'product'            => $this->billsafe_product,
-			'url_return'         => $this->Environment->base . $this->addToUrl('step=complete', true),
-			'url_cancel'         => $this->Environment->base . $this->addToUrl('step=failed', true),
-			'url_image'          => $this->Environment->base . '/' . $this->Isotope->Config->invoiceLogo,
-			'sessionId'          => md5(session_id()),
-			'articleList'        => $this->createItemsArray(),
-		);
-
-		$objRequest = $this->callMethod('prepareOrder', $arrParam);
+		$objRequest = $this->callMethod('prepareOrder', $this->returnOrderRequestParam($objOrder, $this->Isotope->Cart->billingAddress));
 		parse_str($objRequest->response, $arrRequest);
 
 		if ($arrRequest['ack'] == 'ERROR')
@@ -180,12 +172,168 @@ class PaymentBillSAFE extends IsotopePayment
 
 		if ($objOrder->billsafe_token)
 		{
-			$this->redirect($this->gatewayUrl . "?token=" . $objOrder->billsafe_token);
+			$gatewayUrl = ($this->debug) ? $this->gatewayUrlSandbox : $this->gatewayUrlLive;
+			$this->redirect($gatewayUrl . "?token=" . $objOrder->billsafe_token);
 		}
 
 		$this->log('BillSAFE NVP: ack=' . $arrRequest['ack'] . " token=" . $arrRequest['token'], __METHOD__, TL_ERROR);
 		$this->redirect($this->addToUrl('step=failed', true));
 		exit;
+	}
+
+
+	/**
+	 * Return a payment form
+	 * @param object
+	 * @return string
+	 */
+	public function paymentForm($objModule)
+	{
+		if ($this->billsafe_onsiteCheckout)
+		{
+			if ($_SESSION['CHECKOUT_DATA']['payment']['status'] == 'declined')
+			{
+				$objModule->doNotSubmit = true;
+
+				return '<p class="error message">'. $_SESSION['CHECKOUT_DATA']['responseMsg'] . '</p>';
+			}
+
+			$strBuffer = '';
+			$checkboxId = '';
+			$objUser = FrontendUser::getInstance();
+			$arrPayment = $this->Input->post('payment');
+			$this->loadLanguageFile('tl_member');
+
+			// Build form fields
+			$arrFields = array
+			(
+				'billsafe_tc'	=> array
+				(
+					'label'				=> &$GLOBALS['TL_LANG']['ISO']['billsafe_tc'],
+					'inputType'			=> 'checkbox',
+					'options'           => array('accept'),
+					'reference'         => &$GLOBALS['ISO_LANG']['billsafe']['tc'],
+					'eval'				=> array('mandatory'=>true, 'required'=>true),
+				),
+			);
+
+			if (!$objUser->gender)
+			{
+				$arrFields['gender'] = array
+				(
+					'label'                   => &$GLOBALS['TL_LANG']['tl_member']['gender'],
+					'exclude'                 => true,
+					'inputType'               => 'select',
+					'options'                 => array('male', 'female'),
+					'reference'               => &$GLOBALS['TL_LANG']['MSC'],
+					'eval'                    => array('mandatory'=>true, 'required'=>true, 'includeBlankOption'=>true)
+				);
+			}
+
+			if (!$objUser->dateOfBirth)
+			{
+				$arrFields['dateOfBirth'] = array
+				(
+					'label'                   => &$GLOBALS['TL_LANG']['tl_member']['dateOfBirth'],
+					'exclude'                 => true,
+					'inputType'               => 'text',
+					'eval'                    => array('mandatory'=>true, 'required'=>true, 'rgxp'=>'date')
+				);
+			}
+
+			foreach ($arrFields as $field => $arrData)
+			{
+				$strClass = $GLOBALS['TL_FFL'][$arrData['inputType']];
+
+				// Continue if the class is not defined
+				if (!$this->classFileExists($strClass))
+				{
+					continue;
+				}
+
+				$objWidget = new $strClass($this->prepareForWidget($arrData, 'payment['.$this->id.']['.$field.']', $_SESSION['CHECKOUT_DATA']['payment'][$this->id][$field]));
+
+				if ($field == 'billsafe_tc')
+				{
+					$checkboxId = $objWidget->id;
+				}
+
+				// Validate input
+				if ($this->Input->post('FORM_SUBMIT') == 'iso_mod_checkout_payment' && $arrPayment['module'] == $this->id)
+				{
+					$objWidget->validate();
+
+					if ($objWidget->hasErrors())
+					{
+						$objModule->doNotSubmit = true;
+					}
+				}
+
+				$strBuffer .= $objWidget->parse();
+			}
+
+			if ($this->Input->post('FORM_SUBMIT') == 'iso_mod_checkout_payment' && !$objModule->doNotSubmit && $arrPayment['module'] == $this->id && !$_SESSION['CHECKOUT_DATA']['payment']['request_lockout'])
+			{
+				// Gather order data and set IsotopeOrder object
+				$objOrder = new IsotopeOrder();
+
+				if (!$objOrder->findBy('cart_id', $this->Isotope->Cart->id))
+				{
+					$objOrder->uniqid = uniqid($this->Isotope->Config->orderPrefix, true);
+					$objOrder->cart_id = $this->Isotope->Cart->id;
+					$objOrder->findBy('id', $objOrder->save());
+				}
+
+				$_SESSION['CHECKOUT_DATA']['payment']['request_lockout'] = true;
+
+				if (FE_USER_LOGGED_IN)
+				{
+					if ($_SESSION['CHECKOUT_DATA']['payment'][$this->id]['gender'])
+					{
+						$objUser->gender = $_SESSION['CHECKOUT_DATA']['payment'][$this->id]['gender'];
+					}
+
+					if ($_SESSION['CHECKOUT_DATA']['payment'][$this->id]['dateOfBirth'])
+					{
+						$objUser->dateOfBirth = strtotime($_SESSION['CHECKOUT_DATA']['payment'][$this->id]['dateOfBirth']);
+					}
+
+					$objUser->save();
+				}
+
+				// Agreement point 3.2
+				$objOrder->billsafe_tc = array
+				(
+					'timestamp' => time(),
+					'field_value' => $_SESSION['CHECKOUT_DATA']['payment'][$this->id]['billsafe_tc']
+				);
+
+				$objOrder->save();
+
+				unset($_SESSION['CHECKOUT_DATA']['responseMsg']);
+
+				$objModule->doNotSubmit = false;
+			}
+
+			$strJsSnippet = '<script src="https://fn.billsafe.de/fb/js/lazyload-min.js"></script>
+<script>
+LazyLoad.js("https://fn.billsafe.de/fb/js/fb-min.js", function() {
+runFb({
+f: \''. md5(session_id()) . '\',
+s: \'' . $this->billsafe_publicKey . '\',
+e: \'opt_' . $checkboxId . '_0\'
+})});
+</script>
+<noscript>
+<img src="https://fn.billsafe.de/fb/f.png?f=' . md5(session_id()) . '&s=' . $this->billsafe_publicKey . '" />
+</noscript>';
+
+			return ($_SESSION['CHECKOUT_DATA']['responseMsg'] == '' ? '' : '<p class="error message">'. $_SESSION['CHECKOUT_DATA']['responseMsg'] . '</p>')
+			. $strBuffer
+			. $strJsSnippet;
+		}
+
+		return '';
 	}
 
 
@@ -197,6 +345,8 @@ class PaymentBillSAFE extends IsotopePayment
 	 */
 	public function backendInterface($orderId)
 	{
+		$this->updatePaymentInstruction($orderId);
+
 		$i = 0 ;
 		$objOrder = new IsotopeOrder();
 
@@ -246,13 +396,54 @@ class PaymentBillSAFE extends IsotopePayment
 
 
 	/**
-	 * Inform BillSAFE about shipment
+	 * Load the up-to-date payment instruction
+	 * @param int
+	 * @param bool
+	 * @return void|IsotopeOrder
+	 */
+	public function updatePaymentInstruction($orderId, $objOrder=false)
+	{
+		if ($objOrder === false)
+		{
+			$objOrder = new IsotopeOrder();
+
+			if (!$objOrder->findBy('id', $orderId))
+			{
+				return;
+			}
+		}
+
+		$arrParam['orderNumber'] = $objOrder->id;
+		$arrParam['outputType'] = 'STRUCTURED';
+
+		$objRequest = $this->callMethod('getPaymentInstruction', $arrParam);
+		parse_str($objRequest->response, $arrPaymentInstruction);
+
+		if ($arrPaymentInstruction['ack'] == 'OK')
+		{
+			$objOrder->payment_data = $arrPaymentInstruction;
+			$objOrder->save();
+		}
+		else
+		{
+			$this->log('BillSAFE NVP: ' . $arrPaymentInstruction['errorList_0_code'] . " " . $arrPaymentInstruction['errorList_0_message'], __METHOD__, TL_ERROR);
+		}
+
+		if ($objOrder !== false)
+		{
+			return $objOrder;
+		}
+	}
+
+
+	/**
+	 * Inform BillSAFE about order status update (shipped/cancelled)
 	 * @param object
 	 * @param integer
 	 * @param object
 	 * @param bool
 	 */
-	public function reportShipment($objOrder, $intOldStatus, $objNewStatus, $blnActions)
+	public function updateOrderStatusBillSAFE($objOrder, $intOldStatus, $objNewStatus, $blnActions)
 	{
 		$objOldStatus = $this->Database->prepare("SELECT shipped FROM tl_iso_orderstatus WHERE id=?")->execute((int)$intOldStatus);
 
@@ -277,6 +468,31 @@ class PaymentBillSAFE extends IsotopePayment
 			else
 			{
 				$this->Database->prepare("UPDATE tl_iso_orders SET date_shipped=? WHERE id=?")->execute($shippingDate, $objOrder->id);
+				$this->log('New order status update reported to BillSAFE: shipment', __METHOD__, TL_ACCESS);
+			}
+		}
+		// Report cancellation
+		elseif ($objNewStatus->cancelled && !$objOldStatus->cancelled)
+		{
+			$arrParam = array
+			(
+				'orderNumber'           => $objOrder->id,
+				'order_amount'          => 0.00,
+				'order_taxAmount'       => 0.00,
+				'order_currencyCode'    => $this->Isotope->Config->currency,
+				'articleList'           => array()
+			);
+
+			$objRequest = $this->callMethod('updateArticleList', $arrParam);
+			parse_str($objRequest->response, $arrRequest);
+
+			if ($arrRequest['ack'] == 'ERROR')
+			{
+				$this->log('BillSAFE NVP: ' . $arrRequest['errorList_0_code'] . " " . $arrRequest['errorList_0_message'], __METHOD__, TL_ERROR);
+			}
+			else
+			{
+				$this->log('New order status update reported to BillSAFE: cancellation', __METHOD__, TL_ACCESS);
 			}
 		}
 		// Revert shipment report
@@ -292,8 +508,78 @@ class PaymentBillSAFE extends IsotopePayment
 			else
 			{
 				$this->Database->prepare("UPDATE tl_iso_orders SET date_shipped=? WHERE id=?")->execute('', $objOrder->id);
+				$this->log('New order status update reported to BillSAFE: shipment reverted', __METHOD__, TL_ACCESS);
 			}
 		}
+	}
+
+
+	/**
+	 * Return the params for a BillSAFE order request
+	 * @param object
+	 * @param object
+	 * @return array
+	 */
+	protected function returnOrderRequestParam($objOrder, $objAddress)
+	{
+		$order_taxAmount = (int)$objOrder->taxTotal > 0 ? $this->Isotope->Cart->grandTotal : 0;
+
+		// Prevent empty email for members (address book)
+		$objUser = FrontendUser::getInstance();
+		$email = ($objAddress->email) ?: $objUser->email;
+
+		$arrParam = array
+		(
+			'order_number'       => $objOrder->id,
+			'order_amount'       => number_format($this->Isotope->Cart->grandTotal, 2, '.', ''),
+			'order_taxAmount'    => number_format($order_taxAmount, 2, '.', ''),
+			'order_currencyCode' => $this->Isotope->Config->currency,
+			'customer'           => array
+			(
+				'id'          => $objUser->id,
+				//'company'   => $objAddress->company, // B2B transactions are not allowed by default
+				'firstname'   => $objAddress->firstname,
+				'lastname'    => $objAddress->lastname,
+				'street'      => $objAddress->street_1,
+				'houseNumber' => $objAddress->street_2,
+				'postcode'    => $objAddress->postal,
+				'city'        => $objAddress->city,
+				'country'     => $objAddress->country,
+				'email'       => $email,
+				'phone'       => $objAddress->phone,
+			),
+			'product'            => $this->billsafe_product,
+			'sessionId'          => md5(session_id()),
+			'articleList'        => $this->createArticleListArray(),
+		);
+
+		// Required not-default fields
+		if ($objUser->gender)
+		{
+			$arrParam['customer']['gender'] = $objUser->gender{0};
+		}
+		elseif ($_SESSION['CHECKOUT_DATA']['payment'][$this->id]['gender'])
+		{
+			$arrParam['customer']['gender'] = $_SESSION['CHECKOUT_DATA']['payment'][$this->id]['gender']{0};
+		}
+
+		if ($objUser->dateOfBirth)
+		{
+			$arrParam['customer']['dateOfBirth'] = date('Y-m-d', $objUser->dateOfBirth);
+		}
+		elseif ($_SESSION['CHECKOUT_DATA']['payment'][$this->id]['dateOfBirth'])
+		{
+			$arrParam['customer']['dateOfBirth'] = date('Y-m-d', strtotime($_SESSION['CHECKOUT_DATA']['payment'][$this->id]['dateOfBirth']));
+		}
+
+		if (!$this->billsafe_onsiteCheckout)
+		{
+			$arrParam['url_return'] = $this->Environment->base . $this->addToUrl('step=complete', true);
+			$arrParam['url_cancel'] = $this->Environment->base . $this->addToUrl('step=failed', true);
+			$arrParam['url_image']  = $this->Environment->base . '/' . $this->Isotope->Config->invoiceLogo;
+		}
+
+		return $arrParam;
 	}
 
 
@@ -301,7 +587,7 @@ class PaymentBillSAFE extends IsotopePayment
 	 * Create items array for call
 	 * @return array
 	 */
-	protected function createItemsArray()
+	protected function createArticleListArray()
 	{
 		$arrItems = array();
 
@@ -324,7 +610,7 @@ class PaymentBillSAFE extends IsotopePayment
 				'description' => strip_tags($objProduct->description),
 				'quantity'    => $objProduct->quantity_requested,
 				'grossPrice'  => number_format($objProduct->price, 2, '.', ''),
-				'tax'         => $tax,
+				'tax'         => $tax
 			);
 		}
 
@@ -335,14 +621,24 @@ class PaymentBillSAFE extends IsotopePayment
 				continue;
 			}
 
+			$type = 'shipment';
+			$number = 'shipment';
+
+			// Find coupons
+			if ($arrSurcharge['total_price'] < 0)
+			{
+				$type = 'voucher';
+				$number = standardize($arrSurcharge['label'], true);
+			}
+
 			$arrItems[] = array
 			(
-				'number'     => 'shipment',
+				'number'     => $number,
 				'name'       => $arrSurcharge['label'],
-				'type'       => 'shipment',
+				'type'       => $type,
 				'quantity'   => 1,
 				'grossPrice' => number_format($arrSurcharge['total_price'], 2, '.', ''),
-				'tax'        => 0.00,
+				'tax'        => 0.00
 			);
 		}
 
@@ -355,18 +651,12 @@ class PaymentBillSAFE extends IsotopePayment
 	 * @param string
 	 * @param mixed
 	 * @return object
-	 * @todo transfer apiUrl
 	 */
 	public function callMethod($strMethodName, $parameter)
 	{
 		if (!is_object($parameter) && !is_array($parameter))
 		{
 			$this->log('Parameter must be an object or an array', __METHOD__, TL_ERROR);
-		}
-
-		if (!$this->apiUrl)
-		{
-			$this->apiUrl = $this->apiUrlLive;
 		}
 
 		$requestString = $this->_destructurize($parameter)
@@ -379,7 +669,7 @@ class PaymentBillSAFE extends IsotopePayment
 			. '&sdkSignature=' . urlencode(SDK_SIGNATURE);
 
 		$objRequest = new Request();
-		$objRequest->send($this->apiUrl, $this->_convertContentToString($requestString, true), $this->billsafe_method);
+		$objRequest->send(($this->debug) ? $this->apiUrlSandbox : $this->apiUrlLive, $this->_convertContentToString($requestString, true), $this->billsafe_method);
 
 		return $objRequest;
 	}

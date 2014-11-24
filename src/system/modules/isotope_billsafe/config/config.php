@@ -31,6 +31,7 @@ $GLOBALS['ISO_PAY']['billsafe'] = 'PaymentBillSAFE';
 /**
  * Hooks
  */
-$GLOBALS['ISO_HOOKS']['postOrderStatusUpdate'][] = array('PaymentBillSAFEHelper', 'reportShipment');
+$GLOBALS['ISO_HOOKS']['postOrderStatusUpdate'][] = array('PaymentBillSAFEHelper', 'processOrderStatusUpdate');
 $GLOBALS['ISO_HOOKS']['generateCollection'][] = array('PaymentBillSAFEHelper', 'generateCollection');
 $GLOBALS['ISO_HOOKS']['getOrderEmailData'][] = array('PaymentBillSAFEHelper', 'getOrderEmailData');
+$GLOBALS['ISO_HOOKS']['postCheckout'][] = array('PaymentBillSAFEHelper', 'setInvoiceNumber');

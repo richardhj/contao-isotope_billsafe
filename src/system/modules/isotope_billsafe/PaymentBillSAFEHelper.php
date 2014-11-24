@@ -36,14 +36,13 @@ class PaymentBillSAFEHelper extends IsotopeOrder
 
 
 	/**
-	 * Inform BillSAFE about shipment
+	 * Inform BillSAFE about order status update
 	 * @param object
 	 * @param integer
 	 * @param object
 	 * @param bool
-	 * @todo find better solution
 	 */
-	public function reportShipment($objOrder, $intOldStatus, $objNewStatus, $blnActions)
+	public function processOrderStatusUpdate($objOrder, $intOldStatus, $objNewStatus, $blnActions)
 	{
 		$objPayment = $this->Database->prepare("SELECT * FROM tl_iso_payment_modules WHERE id=?")->execute($objOrder->payment_id);
 
@@ -54,7 +53,41 @@ class PaymentBillSAFEHelper extends IsotopeOrder
 
 		// Construct class first
 		$objPaymentBillSAFE = new PaymentBillSAFE($objPayment->row());
-		$objPaymentBillSAFE->reportShipment($objOrder, $intOldStatus, $objNewStatus, $blnActions);
+		$objPaymentBillSAFE->updateOrderStatusBillSAFE($objOrder, $intOldStatus, $objNewStatus, $blnActions);
+	}
+
+
+	/**
+	 * Report invoice number to BillSAFE
+	 * @param object
+	 * @param array
+	 * @param array
+	 */
+	public function setInvoiceNumber($objOrder, $arrItemIds, $arrData)
+	{
+		$objPayment = $this->Database->prepare("SELECT * FROM tl_iso_payment_modules WHERE id=?")->execute($objOrder->payment_id);
+
+		if ($objPayment->type != 'billsafe')
+		{
+			return;
+		}
+
+		$arrParam = array
+		(
+			'orderNumber'   => $objOrder->id,
+			'invoiceNumber' => $objOrder->order_id
+		);
+
+		// Construct class first
+		$objPaymentBillSAFE = new PaymentBillSAFE($objPayment->row());
+		$objRequest = $objPaymentBillSAFE->callMethod('setInvoiceNumber', $arrParam);
+
+		parse_str($objRequest->response, $arrRequest);
+
+		if ($arrRequest['ack'] == 'ERROR')
+		{
+			$this->log('BillSAFE NVP: ' . $arrRequest['errorList_0_code'] . " " . $arrRequest['errorList_0_message'], __METHOD__, TL_ERROR);
+		}
 	}
 
 
@@ -75,7 +108,11 @@ class PaymentBillSAFEHelper extends IsotopeOrder
 			return;
 		}
 
-		$arrInstruction = $objProductCollection->payment_data;
+		// Update payment instruction
+		$objPaymentBillSAFE = new PaymentBillSAFE($objPayment->row());
+		$objPaymentBillSAFE->updatePaymentInstruction($objProductCollection->id);
+
+		$arrInstruction = deserialize($this->Database->prepare("SELECT payment_data FROM tl_iso_orders WHERE id=?")->execute($objProductCollection->id)->payment_data, true);
 
 		if (empty($arrInstruction))
 		{
@@ -106,6 +143,10 @@ class PaymentBillSAFEHelper extends IsotopeOrder
 		{
 			return $arrData;
 		}
+
+		// Update payment instruction
+		$objPaymentBillSAFE = new PaymentBillSAFE($objPayment->row());
+		$objOrder = $objPaymentBillSAFE->updatePaymentInstruction($objOrder->id, $objOrder);
 
 		$arrInstruction = $objOrder->payment_data;
 
