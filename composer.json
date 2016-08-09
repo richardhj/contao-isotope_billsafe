@@ -1,31 +1,40 @@
 {
-  "name":"kirsten-roschanski/isotope-billsafe",
-  "description":"Isotope eCommerce: BillSAFE payment module",
-  "keywords":["contao", "billsafe", "isotope"],
-  "type":"isotope-payment-module",
-  "homepage":"",
-  "license":"LGPL-3.0+",
-  "authors":[
-    {
-      "name":"Kirsten Roschanski",
-      "email":"kontakt@kirsten-roschanski.de",
-      "homepage":"http://kirsten-roschanski.de",
-      "role":"Developer"
+    "name": "richardhj/contao-isotope_billsafe",
+    "type": "contao-module",
+    "description": "BillSAFE payment method for Isotope eCommerce",
+    "keywords": [
+        "contao",
+        "isotope",
+        "billsafe",
+        "payment"
+    ],
+    "license": "LGPL-3.0+",
+    "authors": [
+        {
+            "name": "Richard Henkenjohann",
+            "email": "richardhenkenjohann@googlemail.com",
+            "role": "Developer"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/richardhj/contao-isotope_billsafe/issues",
+        "source": "https://github.com/richardhj/contao-isotope_billsafe"
+    },
+    "require": {
+        "php": ">=5.3",
+        "contao/core": "~3.2",
+        "isotope/isotope-core": "~2.3"
+    },
+    "autoload": {
+        "psr-0": {
+            "Isotope\\": "system/modules/isotope_billsafe/src/"
+        }
+    },
+    "extra": {
+        "contao": {
+            "sources": {
+                "system/modules/isotope_billsafe": "system/modules/isotope_billsafe"
+            }
+        }
     }
-  ],
-  "support":{
-    "email":"kontakt@kirsten-roschanski.de",
-    "issues":"https://github.com/katgirl/isotope-billsafe/issues",
-    "forum":"",
-    "wiki":"https://github.com/katgirl/isotope-billsafe/wiki",
-    "irc":"irc://irc.freenode.org/contao.dev",
-    "source":"https://github.com/katgirl/isotope-billsafe" 
-  },
-  "require":{
-    "php":">=5.3",
-    "contao/core":"2.11"
-  },
-  "autoload": {
-    "classmap": ["src/"]
-  }
 }

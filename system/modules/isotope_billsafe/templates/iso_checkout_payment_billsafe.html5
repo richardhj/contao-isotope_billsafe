@@ -1,0 +1,22 @@
+
+<?= $this->form ?>
+
+<script>
+	window.addEvent('domready', function() {
+		$$('.payment.paymentbillsafe').setStyle('display', 'none');
+		$('opt_paymentmethod_4').addEvent('onchange', function(){
+			alert('clicked!');
+		});
+
+		$$('input.payment_module').each( function(el) {
+			el.addEvent('click', function (event) {
+				$$('.payment_data').setStyle('display', 'none');
+				if ($(('payment_data_'+event.target.value)))
+					$(('payment_data_'+event.target.value)).setStyle('display', 'block');
+			});
+			if (el.checked && $(('payment_data_'+el.value))) {
+				$(('payment_data_'+el.value)).setStyle('display', 'block');
+			}
+		});
+	});
+</script>
