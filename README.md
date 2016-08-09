@@ -1,4 +1,4 @@
-# Simple Stock Management for Isotope eCommerce
+# BillSAFE payment module for Isotope eCommerce
 
 [![Latest Version on Packagist][ico-version]][link-packagist]
 [![Software License][ico-license]]()
