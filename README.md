@@ -22,6 +22,8 @@ Copy the files within the "system" folder to your Contao installation. Update th
 ## Usage
 
 * Create a new payment method in the shop configuration. All keys needed for configuration can be found in the [BillSAFE Portal](https://client.billsafe.de)
+* Do NOT use the OnSite Checkout as it is not implemented yet
+* One order status has to configured to report the shipment to BillSAFE
 
 ## TODO
 
